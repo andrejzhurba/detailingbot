@@ -1,3 +1,7 @@
+import os
+import asyncio
+from aiohttp import web
+from aiogram import Bot, Dispatcher
 import logging
 import asyncio
 import re
@@ -7,8 +11,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from openai import AsyncOpenAI
 
-import os  # Импортируем модуль для работы с системой
 import logging
+
+from aiohttp import web
+import asyncio
 
 from dotenv import load_dotenv  # Добавь эту строку
 load_dotenv()  # И эту — она загрузит данные из файла .env в систему
@@ -79,5 +85,31 @@ async def chat_handler(message: types.Message):
 async def main():
     await dp.start_polling(bot)
 
+# Функция для ответа серверу Render (Health Check)
+async def handle(request):
+    return web.Response(text="I am alive")
+
+async def main():
+    # 1. Настройка веб-сервера для Render
+    app = web.Application()
+    app.router.add_get("/", handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    
+    # Render сам назначит порт через переменную PORT, если нет — будет 10000
+    port = int(os.getenv("PORT", 10000))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    
+    # 2. Запускаем веб-сервер "фоном"
+    asyncio.create_task(site.start())
+    print(f"🚀 Проверка активности запущена на порту {port}")
+    
+    # 3. Запускаем бота (polling)
+    print("🤖 Бот запущен и готов к работе!")
+    await dp.start_polling(bot)
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        print("Бот остановлен")
